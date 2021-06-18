@@ -16,7 +16,8 @@ header <- dashboardHeader(
 # Put all the menu items in the sidebar
 sidebar <- dashboardSidebar(
     sidebarMenu(
-        menuItem("Data", tabName = "tab_data")
+        menuItem("Data", tabName = "tab_data"),
+        menuItem("PCA", tabName = "tab_pca")
     )
 )
 
@@ -43,6 +44,25 @@ body <- dashboardBody(
                     dataTableOutput("colData_output")
                 )
             )
+        ),
+        tabItem(
+            tabName = "tab_pca",
+            fluidRow(
+                box(
+                    title = 'Inputs', 
+                    status = "primary", 
+                    width = 3, 
+                    solidHeader = TRUE,
+                    uiOutput("pca_input")
+                ),
+                box(
+                    title = 'Scores plot', 
+                    status = "primary", 
+                    width = 9, 
+                    solidHeader = TRUE,
+                    plotOutput("pca_scores_plot")
+                )
+            )
         )
     )
 )
@@ -63,6 +83,22 @@ server <- function(input, output){
         colData,
         options = list(pageLength = 5, scrollX=TRUE)
     )
+    output$pca_input <- renderUI({
+        tagList(
+            selectInput("pc_x", "Choose PC on x-axis", choices = 1:5),
+            selectInput("pc_y", "Choose PC on y-axis", choices = 1:5),
+            selectInput("pca_color", "Choose column to color", choices = 1:10)
+        )
+    })
+    output$pca_scores_plot <- renderPlot({
+        PCAObj <- prcomp(as.data.frame(t(exp)))
+        PCAScores <- data.frame(PCAObj$x, cohort = as.factor(as.character(colData[,'tissue', drop = T])))
+        p <- ggplot(PCAScores, aes_string(x = paste0('PC', input$pc_x), 
+                                          y = paste0('PC', input$pc_y),
+                                          fill = 'cohort'))+
+                geom_point(shape=21, size=4, alpha=0.7)
+        p
+    })
 }
 
 shinyApp(ui, server)
