@@ -85,14 +85,14 @@ server <- function(input, output){
     )
     output$pca_input <- renderUI({
         tagList(
-            selectInput("pc_x", "Choose PC on x-axis", choices = 1:5),
-            selectInput("pc_y", "Choose PC on y-axis", choices = 1:5),
-            selectInput("pca_color", "Choose column to color", choices = 1:10)
+            selectInput("pc_x", "Choose PC on x-axis", choices = 1:5, selected = 1),
+            selectInput("pc_y", "Choose PC on y-axis", choices = 1:5, selected = 2),
+            selectInput("pca_color", "Choose column to color", choices = unique(colnames(colData)))
         )
     })
     output$pca_scores_plot <- renderPlot({
         PCAObj <- prcomp(as.data.frame(t(exp)))
-        PCAScores <- data.frame(PCAObj$x, cohort = as.factor(as.character(colData[,'tissue', drop = T])))
+        PCAScores <- data.frame(PCAObj$x, cohort = as.factor(as.character(colData[,input$pca_color, drop = T])))
         p <- ggplot(PCAScores, aes_string(x = paste0('PC', input$pc_x), 
                                           y = paste0('PC', input$pc_y),
                                           fill = 'cohort'))+
