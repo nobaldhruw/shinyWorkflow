@@ -1,5 +1,12 @@
 library(shiny)
 library(shinydashboard)
+library(DT)
+library(cmapR)
+
+# Define some global variables
+gct <- parse.gctx('data/GSE104310.gct')
+exp <- gct@mat
+colData <- gct@cdesc
 
 # Give a title to your app here
 header <- dashboardHeader(
@@ -9,7 +16,7 @@ header <- dashboardHeader(
 # Put all the menu items in the sidebar
 sidebar <- dashboardSidebar(
     sidebarMenu(
-        menuItem("Histogram", tabName = "tab_histogram")
+        menuItem("Data", tabName = "tab_data")
     )
 )
 
@@ -17,21 +24,23 @@ sidebar <- dashboardSidebar(
 body <- dashboardBody(
     tabItems(
         tabItem(
-            tabName = "tab_histogram",
+            tabName = "tab_data",
             fluidRow(
                 box(
-                    title = 'Inputs', 
+                    title = 'Expression Data', 
                     status = "primary", 
-                    width = 4, 
+                    width = 12, 
                     solidHeader = TRUE,
-                    sliderInput("num", "Choose a number", value = 50, min = 10, max = 100, step = 10)
-                ),
+                    dataTableOutput("exp_data_output")
+                )
+            ),
+            fluidRow(
                 box(
-                    title = 'Histogram', 
+                    title = 'Sample metadata', 
                     status = "primary", 
-                    width = 8, 
+                    width = 12, 
                     solidHeader = TRUE,
-                    plotOutput("hist")
+                    dataTableOutput("colData_output")
                 )
             )
         )
@@ -45,9 +54,15 @@ ui <- dashboardPage(
 )
 
 server <- function(input, output){
-    output$hist <- renderPlot({
-        hist(rnorm(input$num))
-    })
+    
+    output$exp_data_output <- renderDT(
+        exp,
+        options = list(pageLength = 5, scrollX=TRUE)
+    )
+    output$colData_output <- renderDT(
+        colData,
+        options = list(pageLength = 5, scrollX=TRUE)
+    )
 }
 
 shinyApp(ui, server)
