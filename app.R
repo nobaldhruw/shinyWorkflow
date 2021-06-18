@@ -7,6 +7,7 @@ library(cmapR)
 gct <- parse.gctx('data/GSE104310.gct')
 exp <- gct@mat
 colData <- gct@cdesc
+source('scripts/helper.R')
 
 # Give a title to your app here
 header <- dashboardHeader(
@@ -74,7 +75,7 @@ ui <- dashboardPage(
 )
 
 server <- function(input, output){
-    
+    rv <- reactiveValues(pca_scores = compute_pca(exp, colData))
     output$exp_data_output <- renderDT(
         exp,
         options = list(pageLength = 5, scrollX=TRUE)
@@ -91,13 +92,7 @@ server <- function(input, output){
         )
     })
     output$pca_scores_plot <- renderPlot({
-        PCAObj <- prcomp(as.data.frame(t(exp)))
-        PCAScores <- data.frame(PCAObj$x, cohort = as.factor(as.character(colData[,input$pca_color, drop = T])))
-        p <- ggplot(PCAScores, aes_string(x = paste0('PC', input$pc_x), 
-                                          y = paste0('PC', input$pc_y),
-                                          fill = 'cohort'))+
-                geom_point(shape=21, size=4, alpha=0.7)
-        p
+        pca_plot(rv$pca_scores, input$pca_color, input$pc_x, input$pc_y)
     })
 }
 
