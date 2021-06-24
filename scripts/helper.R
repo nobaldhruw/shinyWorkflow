@@ -9,6 +9,7 @@ library(ggrepel)
 #
 #####################################################################
 compute_pca <- function(mat, metadata, num_highly_variable_genes = NULL){
+    print("Compute PCA called")
     # Drop rows with NA values
     mat <- as.data.frame(mat[complete.cases(mat), ])
     
