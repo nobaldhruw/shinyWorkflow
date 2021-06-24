@@ -3,6 +3,8 @@ library(shinydashboard)
 library(DT)
 library(cmapR)
 
+options(shiny.maxRequestSize=1024*1024^2)
+
 # Import helper scripts
 source('scripts/helper.R')
 
@@ -16,7 +18,9 @@ sidebar <- dashboardSidebar(
   sidebarMenu(
     menuItem("Data", tabName = "tab_data"),
     menuItem("PCA", tabName = "tab_pca"),
-    menuItem("Differential Expression", tabName = "tab_de")
+    menuItem("Differential Expression", tabName = "tab_de"),
+    menuItem("EnrichR ", tabName = "tab_enrichr"),
+    menuItem("X2K", tabName = "tab_x2k")
   )
 )
 
@@ -108,6 +112,51 @@ body <- dashboardBody(
           plotOutput("de_volcano_plot")
         )
       )
+    ),
+    tabItem(
+      tabName = "tab_enrichr",
+      fluidRow(
+        box(
+          title = 'Input paramters',
+          status = 'primary',
+          width = 3,
+          solidHeader = TRUE,
+          radioButtons("enrichr_gene_direction", "Gene direction", choices=c("up", "down", "both"), selected = "both"),
+          sliderInput("enrichr_abs_logFC_cutoff", "Absolute logFC cutoff", min = 0, max = 10, value = 1),
+          numericInput("enrichr_fdr_cutoff", "FDR cutoff", min = 0, max = 1, value = 0.05),
+          selectInput("enrichr_db", "Choose DB", choices=NULL),
+          numericInput("enrichr_ngs", "No. of gene sets", min=1, max=20, value=10)
+        ),
+        box(
+          title = 'Enriched Gene sets',
+          status = 'primary',
+          width = 9,
+          solidHeader = TRUE,
+          plotOutput("enrichr_dotplot")
+        )
+      )
+    ),
+    tabItem(
+      tabName = "tab_x2k",
+      fluidRow(
+        box(
+          title = 'Input paramters',
+          status = 'primary',
+          width = 3,
+          solidHeader = TRUE,
+          radioButtons("x2k_gene_direction", "Gene direction", choices=c("up", "down", "both"), selected = "both"),
+          sliderInput("x2k_abs_logFC_cutoff", "Absolute logFC cutoff", min = 0, max = 10, value = 1),
+          numericInput("x2k_fdr_cutoff", "FDR cutoff", min = 0, max = 1, value = 0.05),
+          numericInput("x2k_nbars", "No. of bars to show", min=1, max=20, value=10)
+        ),
+        box(
+          title = 'Enriched TFs/Kinases',
+          status = 'primary',
+          width = 9,
+          solidHeader = TRUE,
+          plotOutput("x2k_barplot")
+        )
+      )
     )
   )
 )
@@ -120,7 +169,16 @@ ui <- dashboardPage(
 
 server <- function(input, output, session){
   
-  rv <- reactiveValues(exp=NULL, colData=NULL, pca_scores=NULL, exp.log_transformed=NULL, de_result=NULL)
+  rv <- reactiveValues(
+    exp=NULL, 
+    colData=NULL, 
+    pca_scores=NULL, 
+    exp.log_transformed=NULL, 
+    de_result=NULL,
+    enrichr_dbs=get_enrichr_dblist(),
+    egs=NULL,
+    x2k_result=NULL
+  )
   
   observeEvent(input$inputFile, {
     gctObj <- parse_gctx(input$inputFile$datapath)
@@ -130,6 +188,8 @@ server <- function(input, output, session){
     
     cohortCols <- colnames(rv$colData)
     updateSelectInput(session, inputId = "de_cohortCol", choices = cohortCols, selected = cohortCols[1])
+    updateSelectInput(session, inputId = "enrichr_db", choices = rv$enrichr_dbs, selected = rv$enrichr_dbs[1])
+    
   })
 
   observeEvent(input$de_cohortCol, {
@@ -143,7 +203,21 @@ server <- function(input, output, session){
   
   observeEvent(input$de_button, {
     rv$de_result <- diff_exp_limma(rv$exp.log_transformed, rv$colData, input$de_cohortCol, input$de_cohortA, input$de_cohortB, 'BH')
-    print(rv$de_result)
+  })
+  
+  observeEvent(rv$de_result, {
+      rv$egs <- get_enriched_gene_sets(rv$de_result, 
+                                       gene_direction  = input$enrichr_gene_direction,
+                                       log2fc_cutoff   = input$enrichr_abs_logFC_cutoff, 
+                                       fdr_cutoff      = input$enrichr_fdr_cutoff,
+                                       db              = input$enrichr_db)
+      
+      rv$x2k_result <- run_x2k(rv$de_result, 
+                            gene_direction = input$x2k_gene_direction, 
+                            log2fc_cutoff  = input$x2k_abs_logFC_cutoff, 
+                            fdr_cutoff     = input$x2k_fdr_cutoff,
+                            dbs            = c('ENCODE_and_ChEA_Consensus_TFs_from_ChIP-X','KEA_2015'))
+    
   })
   
   output$exp_data_output <- renderDT(
@@ -179,6 +253,14 @@ server <- function(input, output, session){
                  log2fc_cutoff   = input$de_abs_logFC_cutoff, 
                  p_val_cutoff    = input$de_fdr_cutoff, 
                  ngenes_to_label = input$de_ngenes_to_label)
+  })
+  
+  output$enrichr_dotplot <- renderPlot({
+    plot_enriched_gene_sets(rv$egs, input$enrichr_ngs)
+  })
+  
+  output$x2k_barplot <- renderPlot({
+    plot_x2k_resuts(rv$x2k_result, input$x2k_nbars)
   })
 }
 
